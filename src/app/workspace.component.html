@@ -1,0 +1,136 @@
+@if (!auth.accessToken()) {
+  <app-auth-screen [busy]="busy()" [errorMessage]="errorMessage()" [showRegistration]="showRegistration()" (toggleMode)="toggleRegistration()" (login)="signIn($event)" (register)="createAccount($event)" />
+} @else {
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-lockup" href="#" (click)="$event.preventDefault(); changeSection('overview')">
+        <span class="brand-symbol">H</span><span class="brand-name">FIELDNOTE<small>HELPDESK</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE <span [class.sync-offline]="notificationConnection() !== 'live'">● {{ notificationConnection() === 'live' ? 'LIVE' : notificationConnection() === 'connecting' ? 'CONNECTING' : 'OFFLINE' }}</span></div>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <button type="button" [class.active]="section() === 'overview'" (click)="changeSection('overview')"><span class="nav-glyph">◫</span>Overview</button>
+        <button type="button" [class.active]="section() === 'tickets'" (click)="changeSection('tickets')"><span class="nav-glyph">▤</span>Tickets<span class="nav-count">{{ totalTickets() }}</span></button>
+        @if (auth.role() !== 'Employee') {
+          <button type="button" [class.active]="section() === 'people'" (click)="changeSection('people')"><span class="nav-glyph">♙</span>People</button>
+        }
+        <button type="button" [class.active]="section() === 'updates'" (click)="changeSection('updates')"><span class="nav-glyph">◉</span>Notifications@if (unreadCount()) { <span class="unread-dot"></span> }</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="support-note"><span class="support-mark">?</span><div><b>Need a hand?</b><small>Open a ticket and we'll be there.</small></div></div>
+        <div class="profile-row"><span class="avatar">{{ initials(auth.userId()) }}</span><span class="profile-copy"><b>{{ auth.userId() }}</b><small>{{ roleName() }}</small></span><button class="icon-button signout" type="button" title="Sign out" aria-label="Sign out" (click)="signOut()">↗</button></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="crumb"><span>Workspace</span><span class="crumb-slash">/</span><strong>{{ currentTitle() }}</strong></div>
+        <div class="topbar-actions">
+          <span class="topbar-date">{{ today | date:'EEEE, MMM d' }}</span>
+          <button class="icon-button notification-button" type="button" title="Notifications" [attr.aria-label]="'View notifications, ' + unreadCount() + ' unread'" (click)="changeSection('updates')"><span>♧</span>@if (unreadCount()) { <b class="unread-count">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</b> }</button>
+          @if (auth.role() === 'Employee' || auth.role() === 'Manager') {
+            <button class="button button--dark top-create" type="button" (click)="showCreate.set(true)"><span>+</span> New ticket</button>
+          }
+        </div>
+      </header>
+
+      @if (errorMessage()) { <div class="toast toast--error" role="alert"><span>!</span>{{ errorMessage() }}<button type="button" (click)="errorMessage.set('')" aria-label="Dismiss">×</button></div> }
+      @if (successMessage()) { <div class="toast toast--success" role="status"><span>✓</span>{{ successMessage() }}<button type="button" (click)="successMessage.set('')" aria-label="Dismiss">×</button></div> }
+      @if (liveNotice(); as notice) {
+        <aside class="live-notice" role="status" aria-live="polite">
+          <span class="live-notice-icon">↗</span>
+          <div class="live-notice-copy"><span class="eyebrow">NEW NOTIFICATION</span><b>{{ notice.title }}</b><p>{{ notice.message }}</p><button type="button" class="text-button" (click)="openLiveNotice()">View notifications <span>→</span></button></div>
+          <button class="icon-button live-notice-close" type="button" aria-label="Dismiss notification" (click)="dismissLiveNotice()">×</button>
+        </aside>
+      }
+
+      <div class="content-wrap">
+        @if (section() === 'overview') {
+          <section class="page-intro intro-row">
+            <div><span class="eyebrow">{{ today | date:'MMMM d, y' }} <span class="eyebrow-dot">/</span> {{ roleName() }} VIEW</span><h1>{{ greeting }}, {{ auth.userId() }}</h1><p>Here's the latest from your support workspace.</p></div>
+            <div class="intro-mark" aria-hidden="true"><span>↗</span></div>
+          </section>
+
+          <section class="metrics-grid" aria-label="Ticket summary">
+            <article class="metric metric--highlight"><div class="metric-top"><span>NEEDS ATTENTION</span><span class="metric-icon">↗</span></div><strong>{{ openCount() }}</strong><p>Open or waiting on your team</p><div class="metric-track"><span [style.width.%]="totalTickets() ? (openCount() / tickets().length * 100) : 0"></span></div></article>
+            <article class="metric"><div class="metric-top"><span>IN PROGRESS</span><span class="metric-icon metric-icon--green">◷</span></div><strong>{{ activeCount() }}</strong><p>Currently being worked on</p><div class="metric-foot"><i class="tiny-dot tiny-dot--amber"></i> Active queue</div></article>
+            <article class="metric"><div class="metric-top"><span>RESOLVED</span><span class="metric-icon metric-icon--coral">✓</span></div><strong>{{ resolvedCount() }}</strong><p>Resolved or closed on this page</p><div class="metric-foot"><i class="tiny-dot tiny-dot--green"></i> Good progress</div></article>
+            <article class="metric metric--total"><div class="metric-top"><span>ALL REQUESTS</span><span class="metric-icon">▤</span></div><strong>{{ totalTickets() }}</strong><p>Across your workspace</p><button type="button" class="metric-link" (click)="changeSection('tickets')">View ticket queue <span>→</span></button></article>
+          </section>
+
+          <section class="overview-grid">
+            <div class="panel ticket-panel">
+              <div class="panel-heading"><div><span class="eyebrow">WORKING SET</span><h2>Recent tickets</h2></div><button type="button" class="text-button" (click)="changeSection('tickets')">View all <span>→</span></button></div>
+              <app-ticket-table [tickets]="filteredTickets()" [loading]="loading()" [hasFilters]="searchText().trim().length > 0 || statusFilter() !== 'ALL'" (ticketSelected)="openTicket($event)" />
+            </div>
+            <aside class="panel pulse-panel">
+              <div class="pulse-head"><span class="eyebrow">YOUR WORKSPACE</span><span class="live-tag"><i></i> LIVE</span></div>
+              <h2>Keep the <br>conversation <br><em>moving.</em></h2>
+              <p>Good support is a team effort. Every clear update helps someone get back to work.</p>
+              <div class="pulse-stats"><div><strong>{{ unreadCount() }}</strong><span>Unread updates</span></div><div><strong>{{ tickets().length }}</strong><span>In this view</span></div></div>
+              <button type="button" class="pulse-link" (click)="changeSection('updates')">Go to notifications <span>↗</span></button>
+            </aside>
+          </section>
+        }
+
+        @if (section() === 'tickets') {
+          <section class="page-intro ticket-intro"><div><span class="eyebrow">REQUEST MANAGEMENT <span class="eyebrow-dot">/</span> {{ totalTickets() }} TOTAL</span><h1>Ticket queue</h1><p>Track requests and keep every handoff in context.</p></div>
+            @if (auth.role() === 'Employee' || auth.role() === 'Manager') { <button class="button button--dark" type="button" (click)="showCreate.set(true)"><span>+</span> Create ticket</button> }
+          </section>
+          <section class="panel queue-panel">
+            <div class="queue-tools"><label class="search-box"><span>⌕</span><input aria-label="Search tickets" placeholder="Search tickets" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)"></label><label class="filter-select"><span>STATUS</span><select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)"><option value="ALL">All statuses</option><option value="OPEN">Open</option><option value="ASSIGNED">Assigned</option><option value="IN_PROGRESS">In progress</option><option value="RESOLVED">Resolved</option><option value="CLOSED">Closed</option><option value="REOPENED">Reopened</option></select></label></div>
+            <app-ticket-table [tickets]="filteredTickets()" [loading]="loading()" [hasFilters]="searchText().trim().length > 0 || statusFilter() !== 'ALL'" (ticketSelected)="openTicket($event)" />
+            <div class="pagination"><span>Showing {{ tickets().length ? page() * 10 + 1 : 0 }}–{{ page() * 10 + tickets().length }} of {{ totalTickets() }}</span><div><button type="button" aria-label="Previous page" [disabled]="page() === 0 || loading()" (click)="previousPage()">←</button><span>Page {{ page() + 1 }} / {{ totalPages() }}</span><button type="button" aria-label="Next page" [disabled]="page() + 1 >= totalPages() || loading()" (click)="nextPage()">→</button></div></div>
+          </section>
+        }
+
+        @if (section() === 'people') {
+          <app-people-directory [team]="team()" [agents]="agents()" [manager]="auth.role() === 'Manager'" (roleChanged)="updateMemberRole($event.user, $event.role)" />
+        }
+
+        @if (section() === 'updates') {
+          <app-notification-center [notifications]="notifications()" [unreadCount]="unreadCount()" (refresh)="loadNotifications()" (markRead)="markRead($event)" (openTicket)="openNotificationTicket($event)" />
+        }
+      </div>
+    </main>
+  </div>
+}
+
+@if (showCreate()) {
+  <div class="modal-backdrop" (click)="showCreate.set(false)">
+    <section class="dialog create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-title" (click)="$event.stopPropagation()">
+      <div class="dialog-head"><div><span class="eyebrow">NEW REQUEST</span><h2 id="create-title">Create a ticket</h2></div><button class="icon-button dialog-close" type="button" (click)="showCreate.set(false)" aria-label="Close">×</button></div>
+      <form class="form-stack" (ngSubmit)="submitTicket()">
+        <label>Subject<input name="title" [(ngModel)]="ticketDraft.title" maxlength="150" placeholder="What do you need help with?" required></label>
+        <label>Description<textarea name="description" [(ngModel)]="ticketDraft.description" rows="5" placeholder="Include the details that will help us resolve this." required></textarea></label>
+        <div class="form-pair"><label>Category<select name="category" [(ngModel)]="ticketDraft.category"><option>IT Support</option><option>Access & accounts</option><option>Hardware</option><option>Software</option><option>Facilities</option><option>Other</option></select></label><label>Department ID<input name="departmentId" type="number" min="1" [(ngModel)]="ticketDraft.departmentId" required></label></div>
+        <div class="dialog-actions"><button class="button button--quiet" type="button" (click)="showCreate.set(false)">Cancel</button><button class="button button--primary" type="submit" [disabled]="busy()">{{ busy() ? 'Submitting...' : 'Submit request' }} <span>↗</span></button></div>
+      </form>
+    </section>
+  </div>
+}
+
+@if (selectedTicket(); as ticket) {
+  <div class="modal-backdrop detail-backdrop" (click)="closeTicket()">
+    <section class="dialog detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title" (click)="$event.stopPropagation()">
+      <header class="detail-head"><div><span class="eyebrow">{{ ticket.ticketNumber }} <span class="eyebrow-dot">/</span> {{ ticket.category }}</span><h2 id="detail-title">{{ ticket.title }}</h2></div><button class="icon-button dialog-close" type="button" (click)="closeTicket()" aria-label="Close">×</button></header>
+      <div class="detail-scroll">
+        <div class="detail-summary"><div class="detail-state"><span class="status-pill" [class]="'status-pill status--' + ticket.status.toLowerCase()"><i></i>{{ ticket.status.replace('_', ' ') }}</span><span [class]="'priority priority--' + ticket.priority.toLowerCase()">{{ ticket.priority }} PRIORITY</span></div><p>{{ ticket.description }}</p><div class="detail-meta"><span>Opened by <b>{{ ticket.createdBy }}</b></span><span>Assigned to <b>{{ ticket.assignedTo || 'Unassigned' }}</b></span><span>Updated <b>{{ ticket.updatedAt | date:'MMM d, y · h:mm a' }}</b></span></div></div>
+        @if (auth.role() === 'Manager' || auth.role() === 'Agent') {
+          <div class="ticket-controls">
+            @if (auth.role() === 'Manager') { <label>ASSIGN TO<div class="control-row"><select [(ngModel)]="assignmentTarget" aria-label="Assign ticket to agent"><option value="">Choose agent</option>@for (agent of agents(); track agent.id) { <option [value]="agent.userId">{{ agent.firstName }} {{ agent.lastName }} · {{ agent.userId }}</option> }</select><button class="button button--small" type="button" [disabled]="busy() || !assignmentTarget || assignmentTarget === ticket.assignedTo" (click)="assignTicket(ticket)">Assign</button></div></label> }
+            @if (availableStatuses(ticket).length) { <label>UPDATE STATUS<div class="control-row"><select #nextStatus aria-label="Choose next ticket status">@for (status of availableStatuses(ticket); track status) { <option [value]="status">{{ status.replace('_', ' ') }}</option> }</select><button class="button button--small" type="button" [disabled]="busy()" (click)="changeStatus(ticket, nextStatus.value)">Update</button></div></label> }
+          </div>
+        }
+        <div class="activity-columns">
+          <section class="activity-section"><div class="activity-heading"><h3>Conversation</h3><span>{{ comments().length }} REPLIES</span></div>
+            @if (detailLoading()) { <div class="loading-state"><span class="loader"></span> Loading activity...</div> }
+            @else if (comments().length) { <div class="comment-list">@for (comment of comments(); track comment.id) { <article class="comment-item"><span class="avatar avatar--small">{{ initials(comment.commentedBy) }}</span><div><div class="comment-by"><b>{{ comment.commentedBy }}</b><time>{{ comment.createdAt | date:'MMM d · h:mm a' }}</time></div><p>{{ comment.comment }}</p></div></article> }</div> }
+            @else { <p class="muted-copy activity-empty">No replies yet. Start the conversation below.</p> }
+            <form class="comment-form" (ngSubmit)="postComment()"><label class="visually-hidden" for="comment-box">Add a reply</label><textarea id="comment-box" name="comment" [(ngModel)]="commentDraft" rows="3" placeholder="Write a reply..." required></textarea><div><span>Replies are visible to ticket participants.</span><button class="button button--small button--dark" type="submit" [disabled]="busy() || !commentDraft.trim()">Send reply <span>↗</span></button></div></form>
+          </section>
+          <aside class="activity-section history-section"><div class="activity-heading"><h3>History</h3><span>{{ history().length }} EVENTS</span></div>@if (history().length) { <ol class="history-list">@for (event of history(); track event.id) { <li><i></i><div><b>{{ event.action.replace('_', ' ') }}</b><p>{{ event.oldValue || '—' }} <span>→</span> {{ event.newValue || '—' }}</p><small>{{ event.changedBy }} · {{ event.createdAt | date:'MMM d, h:mm a' }}</small></div></li> }</ol> } @else { <p class="muted-copy activity-empty">No history available.</p> }</aside>
+        </div>
+      </div>
+    </section>
+  </div>
+}

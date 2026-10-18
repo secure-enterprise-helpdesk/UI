@@ -1,0 +1,9 @@
+<section class="page-intro"><div><span class="eyebrow">ACTIVITY FEED <span class="eyebrow-dot">/</span> {{ unreadCount }} UNREAD</span><h1>Notifications</h1><p>Updates from the requests you are part of.</p></div><button class="button button--quiet" type="button" (click)="refresh.emit()">Refresh <span>↻</span></button></section>
+<section class="panel notifications-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST UPDATES</span><h2>Your activity</h2></div><span class="directory-count">{{ notifications.length }} UPDATES</span></div>
+	@if (notifications.length) {
+		<div class="notification-list">@for (item of notifications; track item.notificationId) {
+			<article class="notification-row" [class.notification-row--unread]="!item.read"><button type="button" class="notification-open notification-copy" (click)="openTicket.emit(item)"><span class="notification-icon">{{ item.read ? '✓' : '•' }}</span><span><span class="notification-title"><h3>{{ item.title }}</h3>@if (!item.read) { <span class="new-tag">NEW</span> }</span><span class="notification-message">{{ item.message }}</span><time>{{ item.createdAt | date:'MMM d, y · h:mm a' }}</time></span></button>@if (!item.read) { <button type="button" class="text-button mark-read" (click)="markRead.emit(item)">Mark read</button> }
+			</article>
+		}</div>
+	} @else { <div class="empty-state"><span class="empty-symbol">◉</span><h3>You're all caught up</h3><p>New ticket updates will appear here.</p></div> }
+</section>

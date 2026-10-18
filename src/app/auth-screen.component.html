@@ -1,0 +1,49 @@
+<main class="auth-screen">
+  <section class="auth-story">
+    <div class="story-topline"><span class="brand-symbol">H</span><span>FIELDNOTE <b>HELPDESK</b></span></div>
+    <div class="story-copy">
+      <span class="eyebrow">SECURE SERVICE OPERATIONS</span>
+      <h1>Good work<br>starts with a<br><em>clear signal.</em></h1>
+      <p>One place for requests, responses, and the people who keep work moving.</p>
+    </div>
+    <div class="story-image" role="img" aria-label="Support team collaborating in a modern office"></div>
+    <div class="story-foot"><span>PRIVATE WORKSPACE</span><span>01 / 04</span></div>
+  </section>
+  <section class="auth-panel">
+    <div class="auth-mobile-brand"><span class="brand-symbol">H</span> FIELDNOTE HELPDESK</div>
+    <div class="auth-form-wrap">
+      <div class="auth-heading">
+        <span class="eyebrow">{{ showRegistration ? 'GET STARTED' : 'WELCOME BACK' }}</span>
+        <h2>{{ showRegistration ? 'Create your account' : 'Sign in to your workspace' }}</h2>
+        <p>{{ showRegistration ? 'Your team workspace is one step away.' : 'Use your work credentials to continue.' }}</p>
+      </div>
+      @if (showRegistration) {
+        <form class="form-stack" (ngSubmit)="submitRegistration()">
+          <div class="form-pair">
+            <label>First name<input name="firstName" [(ngModel)]="registration.firstName" autocomplete="given-name" required></label>
+            <label>Last name<input name="lastName" [(ngModel)]="registration.lastName" autocomplete="family-name" required></label>
+          </div>
+          <label>Work email<input name="email" type="email" [(ngModel)]="registration.email" autocomplete="email" required></label>
+          <label>Username<input name="userId" [(ngModel)]="registration.userId" autocomplete="username" required></label>
+          <div class="form-pair">
+            <label>Phone<input name="phone" type="tel" [(ngModel)]="registration.phoneNumber" autocomplete="tel" required></label>
+            <label>Department ID<input name="departmentId" type="number" min="1" [(ngModel)]="registration.departmentId" required></label>
+          </div>
+          <label>Password<input name="password" type="password" [(ngModel)]="registration.password" autocomplete="new-password" minlength="8" required></label>
+          <button class="button button--primary button--full" type="submit" [disabled]="busy">{{ busy ? 'Creating account...' : 'Create account' }} <span>↗</span></button>
+        </form>
+      } @else {
+        <form class="form-stack" (ngSubmit)="submitLogin()">
+          <label>Username<input name="userId" [(ngModel)]="loginForm.userId" autocomplete="username" placeholder="Your work username" required></label>
+          <label>Password<input name="password" type="password" [(ngModel)]="loginForm.password" autocomplete="current-password" placeholder="Enter your password" required></label>
+          <button class="button button--primary button--full" type="submit" [disabled]="busy">{{ busy ? 'Signing in...' : 'Sign in securely' }} <span>↗</span></button>
+        </form>
+      }
+      @if (errorMessage) { <p class="notice notice--error" role="alert">{{ errorMessage }}</p> }
+      <p class="auth-toggle">{{ showRegistration ? 'Already have an account?' : 'New to this workspace?' }}
+        <button type="button" class="text-button" (click)="toggleRegistration()">{{ showRegistration ? 'Sign in' : 'Create an account' }}</button>
+      </p>
+      <p class="auth-security"><span class="security-dot"></span> Protected by encrypted session access</p>
+    </div>
+  </section>
+</main>

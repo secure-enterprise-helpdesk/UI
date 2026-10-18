@@ -1,0 +1,19 @@
+<section class="page-intro"><div><span class="eyebrow">TEAM DIRECTORY <span class="eyebrow-dot">/</span> {{ team.length }} MEMBERS</span><h1>People</h1><p>Know who's here and keep the work moving together.</p></div></section>
++<section class="panel people-panel"><div class="panel-heading"><div><span class="eyebrow">WORKSPACE DIRECTORY</span><h2>Team members</h2></div><span class="directory-count">{{ team.length }} PEOPLE</span></div>
++  @if (team.length) {
++    <div class="people-list"><div class="people-header"><span>PERSON</span><span>USER ID</span><span>DEPARTMENT</span><span>ACCESS</span></div>
++      @for (person of team; track person.id) {
++        <div class="person-row"><span class="person-name"><i class="avatar avatar--small">{{ initials(person.userId) }}</i><b>{{ person.firstName }} {{ person.lastName }}</b></span><span class="person-id">{{ person.userId }}</span><span class="person-dept">Department {{ person.departmentId }}</span><span class="person-access">
++          @if (manager) {
++            <select [ngModel]="person.role || ''" (ngModelChange)="changeRole(person, $event)" aria-label="Update user role"><option value="" disabled>Select access</option><option value="Employee">Employee</option><option value="Agent">Agent</option><option value="Manager">Manager</option></select>
++          } @else { <span class="role-pill">{{ person.role || 'Employee' }}</span> }
++        </span></div>
++      }
++    </div>
++  } @else { <div class="empty-state"><span class="empty-symbol">♙</span><h3>No team members to show</h3><p>Team access is available to agents and managers.</p></div> }
++</section>
++@if (manager) {
++  <section class="panel agent-panel"><div class="panel-heading"><div><span class="eyebrow">TICKET ROUTING</span><h2>Support agents</h2></div><span class="directory-count">{{ agents.length }} AGENTS</span></div>
++    <div class="agent-chips">@for (agent of agents; track agent.id) { <span class="agent-chip"><i class="avatar avatar--small">{{ initials(agent.userId) }}</i><span><b>{{ agent.firstName }} {{ agent.lastName }}</b><small>{{ agent.userId }}</small></span></span> } @empty { <p class="muted-copy">No agents are registered yet.</p> }</div>
++  </section>
++}
