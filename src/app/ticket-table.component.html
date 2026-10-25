@@ -1,0 +1,17 @@
+@if (loading) {
+  <div class="loading-state"><span class="loader"></span> Loading tickets...</div>
+} @else if (tickets.length) {
+  <div class="table-scroll"><table class="ticket-table"><thead><tr><th>REQUEST</th><th>STATUS</th><th>PRIORITY</th><th>UPDATED</th><th></th></tr></thead><tbody>
+    @for (ticket of tickets; track ticket.id) {
+      <tr (click)="ticketSelected.emit(ticket)" tabindex="0" (keydown.enter)="ticketSelected.emit(ticket)">
+        <td><div class="ticket-title"><span class="ticket-ref">{{ ticket.ticketNumber }}</span><b>{{ ticket.title }}</b><small>{{ ticket.category }} · {{ ticket.createdBy }}</small></div></td>
+        <td><span [class]="'status-pill status--' + ticket.status.toLowerCase()"><i></i>{{ ticket.status.replace('_', ' ') }}</span></td>
+        <td><span [class]="'priority priority--' + ticket.priority.toLowerCase()">{{ ticket.priority }}</span></td>
+        <td class="updated-date">{{ ticket.updatedAt | date:'MMM d, h:mm a' }}</td>
+        <td><button class="row-open" type="button" (click)="$event.stopPropagation(); ticketSelected.emit(ticket)" aria-label="Open ticket">↗</button></td>
+      </tr>
+    }
+  </tbody></table></div>
+} @else {
+  <div class="empty-state"><span class="empty-symbol">▤</span><h3>{{ hasFilters ? 'No matching tickets' : 'No tickets yet' }}</h3><p>{{ hasFilters ? 'Try changing your search or status filter.' : 'When a request comes in, it will show up here.' }}</p></div>
+}
