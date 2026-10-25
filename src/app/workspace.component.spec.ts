@@ -9,6 +9,7 @@ import { WorkspaceComponent } from './workspace.component';
 describe('WorkspaceComponent live notifications', () => {
   let api: jasmine.SpyObj<HelpdeskApi>;
   let socketMessageHandler: ((payload: unknown) => void) | undefined;
+  let socketStatusHandler: ((status: 'connecting' | 'live' | 'offline') => void) | undefined;
   const emptyPage = <T>(): Page<T> => ({ content: [], totalElements: 0, totalPages: 1, number: 0, size: 100 });
 
   beforeEach(async () => {
@@ -20,6 +21,7 @@ describe('WorkspaceComponent live notifications', () => {
     api.history.and.returnValue(of(emptyPage<TicketHistory>()));
     api.employees.and.returnValue(of([]));
     socketMessageHandler = undefined;
+    socketStatusHandler = undefined;
     const socket = {
       connect: jasmine.createSpy('connect').and.callFake((
         _token: string,
@@ -27,6 +29,7 @@ describe('WorkspaceComponent live notifications', () => {
         onStatus: (status: 'connecting' | 'live' | 'offline') => void
       ) => {
         socketMessageHandler = onMessage;
+        socketStatusHandler = onStatus;
         onStatus('live');
         return Promise.resolve();
       }),
@@ -66,6 +69,41 @@ describe('WorkspaceComponent live notifications', () => {
     expect(fixture.componentInstance.liveNotice()?.notificationId).toBe('notification-1');
     fixture.destroy();
   });
+
+  it('shows newly unread notifications through polling when the socket is offline', fakeAsync(() => {
+    const notification: NotificationItem = {
+      id: 2,
+      notificationId: 'notification-from-poll',
+      ticketNumber: 'TCK-TEST1234',
+      type: 'TICKET_ASSIGNED',
+      title: 'Ticket assigned',
+      message: 'A ticket was assigned to you.',
+      read: false,
+      createdAt: '2026-10-05T12:00:00Z'
+    };
+    api.notifications.and.returnValues(
+      of(emptyPage<NotificationItem>()),
+      of(emptyPage<NotificationItem>()),
+      of({ ...emptyPage<NotificationItem>(), content: [notification], totalElements: 1 })
+    );
+    const auth = TestBed.inject(AuthSession);
+    const payload = btoa(JSON.stringify({ sub: 'agent.demo', role: 'Agent' }));
+    auth.store({ accessToken: `header.${payload}.signature`, refreshToken: 'refresh', tokenType: 'Bearer', expiresIn: 900 });
+
+    const fixture = TestBed.createComponent(WorkspaceComponent);
+    fixture.detectChanges();
+    socketStatusHandler!('offline');
+
+    tick(14_999);
+    expect(fixture.componentInstance.liveNotice()).toBeNull();
+    tick(1);
+
+    expect(fixture.componentInstance.notificationConnection()).toBe('polling');
+    expect(fixture.componentInstance.notifications()[0].notificationId).toBe(notification.notificationId);
+    expect(fixture.componentInstance.unreadCount()).toBe(1);
+    expect(fixture.componentInstance.liveNotice()?.notificationId).toBe(notification.notificationId);
+    fixture.destroy();
+  }));
 
   it('opens the ticket referenced by a notification', () => {
     const ticket: Ticket = {

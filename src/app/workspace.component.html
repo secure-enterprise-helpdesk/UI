@@ -6,7 +6,7 @@
       <a class="brand-lockup" href="#" (click)="$event.preventDefault(); changeSection('overview')">
         <span class="brand-symbol">H</span><span class="brand-name">FIELDNOTE<small>HELPDESK</small></span>
       </a>
-      <div class="workspace-label">WORKSPACE <span [class.sync-offline]="notificationConnection() !== 'live'">● {{ notificationConnection() === 'live' ? 'LIVE' : notificationConnection() === 'connecting' ? 'CONNECTING' : 'OFFLINE' }}</span></div>
+      <div class="workspace-label">WORKSPACE <span [class.sync-offline]="notificationConnection() === 'offline'" [class.sync-polling]="notificationConnection() === 'polling'">● {{ notificationConnection() === 'live' ? 'LIVE' : notificationConnection() === 'connecting' ? 'CONNECTING' : notificationConnection() === 'polling' ? 'SYNCING' : 'OFFLINE' }}</span></div>
       <nav class="primary-nav" aria-label="Main navigation">
         <button type="button" [class.active]="section() === 'overview'" (click)="changeSection('overview')"><span class="nav-glyph">◫</span>Overview</button>
         <button type="button" [class.active]="section() === 'tickets'" (click)="changeSection('tickets')"><span class="nav-glyph">▤</span>Tickets<span class="nav-count">{{ totalTickets() }}</span></button>

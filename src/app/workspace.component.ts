@@ -35,7 +35,7 @@ export class WorkspaceComponent implements OnDestroy {
   readonly notifications = signal<NotificationItem[]>([]);
   readonly unreadCount = signal(0);
   readonly liveNotice = signal<NotificationItem | null>(null);
-  readonly notificationConnection = signal<'connecting' | 'live' | 'offline'>('offline');
+  readonly notificationConnection = signal<'connecting' | 'live' | 'polling' | 'offline'>('offline');
   readonly selectedTicket = signal<Ticket | null>(null);
   readonly comments = signal<TicketComment[]>([]);
   readonly history = signal<TicketHistory[]>([]);
@@ -75,6 +75,7 @@ export class WorkspaceComponent implements OnDestroy {
   assignmentTarget = '';
   private readonly knownNotificationIds = new Set<string>();
   private livePolling?: Subscription;
+  private pollingAvailable = false;
   private liveNoticeTimeout?: ReturnType<typeof setTimeout>;
 
   constructor() {
@@ -147,15 +148,16 @@ export class WorkspaceComponent implements OnDestroy {
   loadWorkspace(): void {
     this.errorMessage.set('');
     const accessToken = this.auth.accessToken();
+    this.startNotificationPolling();
     if (accessToken) {
       void this.notificationSocket.connect(
         accessToken,
         payload => this.handleWebSocketNotification(payload),
-        status => this.notificationConnection.set(status)
+        status => this.notificationConnection.set(
+          status !== 'live' && this.pollingAvailable ? 'polling' : status
+        )
       );
     }
-    // Temporarily disabled: websocket debugging is active; poll loop is turned off.
-    // this.startNotificationPolling();
     this.loadTickets(0);
     this.loadNotifications();
     this.loadPeople();
@@ -209,7 +211,9 @@ export class WorkspaceComponent implements OnDestroy {
         this.unreadCount.set(unread.totalElements ?? unread.content?.length ?? 0);
       },
       error: error => {
-        this.notificationConnection.set('offline');
+        if (this.notificationConnection() !== 'live' && !this.pollingAvailable) {
+          this.notificationConnection.set('offline');
+        }
         this.errorMessage.set(this.readError(error, 'Notifications could not be loaded.'));
       }
     });
@@ -395,32 +399,38 @@ export class WorkspaceComponent implements OnDestroy {
   }
 
   private startNotificationPolling(): void {
-    // Temporarily disabled for WebSocket-only debugging.
-    // if (this.livePolling || !this.auth.accessToken()) return;
-    // this.livePolling = timer(15_000, 15_000).pipe(
-    //   switchMap(() => this.api.notifications(true).pipe(
-    //     tap(result => {
-    //       this.notificationConnection.set('live');
-    //       const unread = result.content ?? [];
-    //       const arriving = unread.filter(item => !this.knownNotificationIds.has(item.notificationId));
-    //       for (const item of unread) this.knownNotificationIds.add(item.notificationId);
-    //       if (arriving.length) {
-    //         this.notifications.update(current => {
-    //           const merged = [...arriving, ...current];
-    //           return [...new Map(merged.map(item => [item.notificationId, item])).values()].slice(0, 100);
-    //         });
-    //         this.liveNotice.set(arriving[0]);
-    //         if (this.liveNoticeTimeout) clearTimeout(this.liveNoticeTimeout);
-    //         this.liveNoticeTimeout = setTimeout(() => this.liveNotice.set(null), 8_000);
-    //       }
-    //       this.unreadCount.set(result.totalElements ?? unread.length);
-    //     }),
-    //     catchError(() => {
-    //       this.notificationConnection.set('offline');
-    //       return EMPTY;
-    //     })
-    //   ))
-    // ).subscribe();
+    if (this.livePolling || !this.auth.accessToken()) return;
+    this.livePolling = timer(15_000, 15_000).pipe(
+      switchMap(() => this.api.notifications(true).pipe(
+        tap(result => {
+          this.pollingAvailable = true;
+          if (this.notificationConnection() !== 'live') {
+            this.notificationConnection.set('polling');
+          }
+          const unread = result.content ?? [];
+          const arriving = unread.filter(item => !this.knownNotificationIds.has(item.notificationId));
+          for (const item of unread) this.knownNotificationIds.add(item.notificationId);
+          if (arriving.length) {
+            this.notifications.update(current => {
+              const merged = [...arriving, ...current];
+              return [...new Map(merged.map(item => [item.notificationId, item])).values()].slice(0, 100);
+            });
+            this.liveNotice.set(arriving[0]);
+            if (this.liveNoticeTimeout) clearTimeout(this.liveNoticeTimeout);
+            this.liveNoticeTimeout = setTimeout(() => this.liveNotice.set(null), 8_000);
+          }
+          this.unreadCount.set(result.totalElements ?? unread.length);
+        }),
+        catchError(error => {
+          this.pollingAvailable = false;
+          if (this.notificationConnection() !== 'live') {
+            this.notificationConnection.set('offline');
+          }
+          console.error('Notification polling failed:', error);
+          return EMPTY;
+        })
+      ))
+    ).subscribe();
   }
 
   private stopNotificationPolling(): void {

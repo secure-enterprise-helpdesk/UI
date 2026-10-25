@@ -58,6 +58,7 @@
 .workspace-label { margin: 47px 10px 13px; color: #819087; font: 10px 'DM Mono', monospace; letter-spacing: .9px; }
 .workspace-label span { float: right; color: #b6d66f; font-size: 9px; }
 .workspace-label .sync-offline { color: #e6a17c; }
+.workspace-label .sync-polling { color: #e6c679; }
 .primary-nav { display: grid; gap: 5px; }
 .primary-nav button { height: 42px; padding: 0 10px; border: 0; border-radius: 4px; display: flex; align-items: center; gap: 12px; color: #aeb9b0; background: transparent; text-align: left; font-size: 12px; transition: color .15s, background .15s; }
 .primary-nav button:hover { color: #fff; background: rgba(255,255,255,.06); }
