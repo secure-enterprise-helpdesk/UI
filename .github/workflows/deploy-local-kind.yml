@@ -1,0 +1,46 @@
+name: Deploy Frontend to local Kind
+
+on:
+  push:
+    branches: [dev]
+    paths: ["src/**", "public/**", "package.json", "package-lock.json", "angular.json", "Dockerfile", ".dockerignore", "nginx.conf"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-kind-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, X64, helpdesk-kind]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local Docker and Kubernetes context
+        shell: pwsh
+        run: |
+          docker info --format '{{.ServerVersion}}'
+          if ($LASTEXITCODE -ne 0) { throw "Docker engine is unavailable." }
+          $context = (kubectl config current-context).Trim()
+          if ($LASTEXITCODE -ne 0 -or $context -ne "kind-helpdesk") {
+            throw "kubectl context must be kind-helpdesk; found '$context'."
+          }
+      - name: Build frontend image
+        shell: pwsh
+        run: |
+          docker build -t secureaienterprisehelpdesk-frontend:dev-20261024-notification-fallback .
+          if ($LASTEXITCODE -ne 0) { throw "Frontend image build failed." }
+      - name: Load image into Kind
+        shell: pwsh
+        run: |
+          kind load docker-image secureaienterprisehelpdesk-frontend:dev-20261024-notification-fallback --name helpdesk
+          if ($LASTEXITCODE -ne 0) { throw "Could not load the frontend image." }
+      - name: Roll out frontend
+        shell: pwsh
+        run: |
+          kubectl rollout restart deployment/frontend -n helpdesk
+          if ($LASTEXITCODE -ne 0) { throw "Could not restart frontend." }
+          kubectl rollout status deployment/frontend -n helpdesk --timeout=300s
+          if ($LASTEXITCODE -ne 0) { throw "Frontend rollout failed." }
